@@ -20,6 +20,12 @@ type Detection = {
   box: { x1: number; y1: number; x2: number; y2: number }
 }
 
+type TrackedObject = {
+  label: string
+  box: Detection['box']
+  missedFrames: number
+}
+
 const API_URL = (import.meta.env.VITE_API_URL?.trim() ?? (import.meta.env.DEV
   ? 'http://localhost:8000'
   : '')).replace(/\/+$/, '')
@@ -42,7 +48,7 @@ function App() {
   const pollingTimerRef = useRef<number | null>(null)
   const pollDetectionRef = useRef<(() => Promise<void>) | null>(null)
   const detectionRequestedRef = useRef(false)
-  const activeObjectsRef = useRef(new Map<string, number>())
+  const activeObjectsRef = useRef<TrackedObject[]>([])
   const speechQueueRef = useRef<string | null>(null)
   const speechProcessingRef = useRef(false)
   const speechVersionRef = useRef(0)
@@ -156,23 +162,49 @@ function App() {
 
   const narrate = useCallback(
     (nextDetections: Detection[]) => {
-      const currentLabels = new Set(nextDetections.map((detection) => detection.label))
-      const newDetections = nextDetections.filter((detection) => {
-        const missedFrames = activeObjectsRef.current.get(detection.label)
-        activeObjectsRef.current.set(detection.label, 0)
-        return missedFrames === undefined
-      })
+      const tracks = activeObjectsRef.current
+      const matchedTrackIndexes = new Set<number>()
+      const newDetections: Detection[] = []
 
-      for (const [label, missedFrames] of activeObjectsRef.current) {
-        if (!currentLabels.has(label)) {
-          const nextMissedFrames = missedFrames + 1
-          if (nextMissedFrames >= 2) {
-            activeObjectsRef.current.delete(label)
-          } else {
-            activeObjectsRef.current.set(label, nextMissedFrames)
+      for (const detection of nextDetections) {
+        const detectionCenterX = (detection.box.x1 + detection.box.x2) / 2
+        const detectionCenterY = (detection.box.y1 + detection.box.y2) / 2
+        let bestTrackIndex = -1
+        let bestDistance = Number.POSITIVE_INFINITY
+
+        tracks.forEach((track, index) => {
+          if (matchedTrackIndexes.has(index) || track.label !== detection.label) return
+          const trackCenterX = (track.box.x1 + track.box.x2) / 2
+          const trackCenterY = (track.box.y1 + track.box.y2) / 2
+          const distance = Math.hypot(
+            detectionCenterX - trackCenterX,
+            detectionCenterY - trackCenterY,
+          )
+          if (distance < bestDistance) {
+            bestDistance = distance
+            bestTrackIndex = index
           }
+        })
+
+        if (bestTrackIndex >= 0 && bestDistance <= 15) {
+          tracks[bestTrackIndex] = {
+            ...tracks[bestTrackIndex],
+            box: detection.box,
+            missedFrames: 0,
+          }
+          matchedTrackIndexes.add(bestTrackIndex)
+        } else {
+          newDetections.push(detection)
+          tracks.push({ label: detection.label, box: detection.box, missedFrames: 0 })
+          matchedTrackIndexes.add(tracks.length - 1)
         }
       }
+
+      activeObjectsRef.current = tracks
+        .map((track, index) => matchedTrackIndexes.has(index)
+          ? track
+          : { ...track, missedFrames: track.missedFrames + 1 })
+        .filter((track) => track.missedFrames < 2)
 
       if (isMuted || newDetections.length === 0) return
       enqueueSpeech(newDetections.map(formatDetection).join(' '))
@@ -263,7 +295,7 @@ function App() {
 
   useEffect(() => () => {
     audioRef.current?.pause()
-    activeObjectsRef.current.clear()
+    activeObjectsRef.current = []
     speechQueueRef.current = null
     speechVersionRef.current += 1
     speechAbortRef.current?.abort()
