@@ -23,7 +23,28 @@ class ElevenLabsService:
             raise ElevenLabsError(
                 "ElevenLabs is not configured. Set ELEVENLABS_API_KEY on the backend."
             )
-        return {"xi-api-key": self.api_key}
+        return {
+            "Accept": "application/json",
+            "xi-api-key": self.api_key.strip(),
+        }
+
+    @staticmethod
+    def _provider_error(response: httpx.Response, operation: str) -> ElevenLabsError:
+        detail = ""
+        try:
+            body = response.json()
+            if isinstance(body, dict):
+                raw_detail = body.get("detail") or body.get("message") or body.get("error")
+                detail = str(raw_detail) if raw_detail else ""
+        except ValueError:
+            detail = response.text.strip()
+
+        if len(detail) > 300:
+            detail = f"{detail[:297]}..."
+        suffix = f" Detail: {detail}" if detail else ""
+        return ElevenLabsError(
+            f"ElevenLabs {operation} failed with HTTP {response.status_code}.{suffix}"
+        )
 
     async def get_voices(self) -> dict:
         try:
@@ -32,13 +53,12 @@ class ElevenLabsService:
                     f"{self._base_url}/v2/voices",
                     headers=self._headers(),
                 )
-            response.raise_for_status()
+            if response.is_error:
+                raise self._provider_error(response, "voice request")
         except httpx.TimeoutException as exc:
             raise ElevenLabsError("ElevenLabs voice request timed out.") from exc
-        except httpx.HTTPStatusError as exc:
-            raise ElevenLabsError(
-                f"ElevenLabs voice request failed with HTTP {exc.response.status_code}."
-            ) from exc
+        except ElevenLabsError:
+            raise
         except httpx.HTTPError as exc:
             raise ElevenLabsError("ElevenLabs voice request failed.") from exc
         return response.json()
@@ -73,13 +93,12 @@ class ElevenLabsService:
                     },
                     json=payload,
                 )
-            response.raise_for_status()
+            if response.is_error:
+                raise self._provider_error(response, "speech request")
         except httpx.TimeoutException as exc:
             raise ElevenLabsError("ElevenLabs speech request timed out.") from exc
-        except httpx.HTTPStatusError as exc:
-            raise ElevenLabsError(
-                f"ElevenLabs speech request failed with HTTP {exc.response.status_code}."
-            ) from exc
+        except ElevenLabsError:
+            raise
         except httpx.HTTPError as exc:
             raise ElevenLabsError("ElevenLabs speech request failed.") from exc
         return response.content
