@@ -13,7 +13,11 @@ from app.schemas.tts import SpeakRequest
 from app.services.detector import Detector, InvalidImageError, ModelUnavailableError
 from app.services.elevenlabs_service import ElevenLabsError, ElevenLabsService
 
-detector = Detector(settings.model_path, settings.confidence_threshold)
+detector = Detector(
+    settings.model_path,
+    settings.confidence_threshold,
+    settings.fallback_model_path,
+)
 elevenlabs = ElevenLabsService(
     settings.elevenlabs_api_key,
     settings.elevenlabs_model_id,

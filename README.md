@@ -43,6 +43,10 @@ kept at `backend/models/base/yolo11n.pt`. You can switch models without changing
 Python code by setting `YOLO_MODEL_PATH` to another path relative to
 `backend/`, such as `models/base/yolo11n.pt`.
 
+If the configured teammate model is not present or cannot be loaded, the
+detector automatically falls back to `backend/models/base/yolo11n.pt`. The
+health endpoint reports `detector_mode: "yolo-fallback"` while this happens.
+
 ## Repository structure
 
 ```text
@@ -350,6 +354,9 @@ ALLOWED_ORIGINS=https://your-site.netlify.app
 Railway supplies `PORT`; do not replace `$PORT` with a fixed production port.
 The Docker image copies `backend/`, so the configured relative model path is
 resolved inside the deployed backend directory.
+The base fallback weights must also be present in the deployed source. The
+repository keeps `backend/models/base/yolo11n.pt` trackable; larger teammate
+weights should use Git LFS or external model storage.
 
 ### Backend environment variables
 

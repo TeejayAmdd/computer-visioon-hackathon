@@ -47,8 +47,15 @@ class Detector:
         "cat": 0.3,
     }
 
-    def __init__(self, model_path: Path, confidence_threshold: float) -> None:
+    def __init__(
+        self,
+        model_path: Path,
+        confidence_threshold: float,
+        fallback_model_path: Path | None = None,
+    ) -> None:
         self.model_path = model_path
+        self.configured_model_path = model_path
+        self.fallback_model_path = fallback_model_path
         self.confidence_threshold = confidence_threshold
         self.model: Any = None
         self.mode = "fallback"
@@ -60,25 +67,70 @@ class Detector:
         return self.model is not None
 
     def load(self) -> None:
-        can_download_default = self.model_path.name in {"yolo11n.pt", "yolov8n.pt"}
-        if not self.model_path.exists() and not can_download_default:
-            self.load_error = f"YOLO model not found at: {self.model_path}"
-            logging.error(self.load_error)
-            return
+        configured_error = self._model_path_error(self.model_path)
+        if configured_error:
+            logging.warning(
+                "%s Falling back to the base YOLO model.",
+                configured_error,
+            )
+            if self.fallback_model_path is None:
+                self.load_error = configured_error
+                return
+            fallback_error = self._model_path_error(self.fallback_model_path)
+            if fallback_error:
+                self.load_error = f"{configured_error} {fallback_error}"
+                logging.error(self.load_error)
+                return
+            self.model_path = self.fallback_model_path
+            self.mode = "yolo-fallback"
+
         try:
             from ultralytics import YOLO
 
             self.model = YOLO(str(self.model_path))
-            self.mode = "yolo"
+            if self.model_path == self.configured_model_path:
+                self.mode = "yolo"
             self.load_error = None
         except Exception as exc:
-            self.model = None
-            self.mode = "fallback"
-            self.load_error = (
+            configured_error = (
                 f"Could not load YOLO model at {self.model_path}: "
                 f"{type(exc).__name__}: {exc}"
             )
             logging.exception("Could not load YOLO model from %s", self.model_path)
+            if (
+                self.model_path == self.configured_model_path
+                and self.fallback_model_path is not None
+                and self.fallback_model_path.exists()
+            ):
+                logging.warning(
+                    "%s Falling back to the base YOLO model.",
+                    configured_error,
+                )
+                try:
+                    self.model_path = self.fallback_model_path
+                    self.model = YOLO(str(self.model_path))
+                    self.mode = "yolo-fallback"
+                    self.load_error = None
+                    return
+                except Exception as fallback_exc:
+                    configured_error = (
+                        f"{configured_error} Base model also failed to load: "
+                        f"{type(fallback_exc).__name__}: {fallback_exc}"
+                    )
+                    logging.exception(
+                        "Could not load fallback YOLO model from %s",
+                        self.fallback_model_path,
+                    )
+            self.model = None
+            self.mode = "fallback"
+            self.load_error = configured_error
+
+    @staticmethod
+    def _model_path_error(model_path: Path) -> str | None:
+        can_download_default = model_path.name in {"yolo11n.pt", "yolov8n.pt"}
+        if not model_path.exists() and not can_download_default:
+            return f"YOLO model not found at: {model_path}"
+        return None
 
     def detect(self, image_bytes: bytes) -> list[Detection]:
         image = self._read_image(image_bytes)

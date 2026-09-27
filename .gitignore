@@ -45,5 +45,6 @@ models/*.pt
 models/**/*.pt
 backend/models/*.pt
 backend/models/**/*.pt
+!backend/models/base/yolo11n.pt
 models/*.onnx
 runs/

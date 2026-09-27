@@ -13,6 +13,7 @@ class Settings:
             os.getenv("MODEL_PATH", "models/teammate_model/best.pt"),
         )
     )
+    fallback_model_path: Path = BASE_DIR / "models" / "base" / "yolo11n.pt"
     confidence_threshold: float = float(os.getenv("CONFIDENCE_THRESHOLD", "0.35"))
     elevenlabs_api_key: str | None = os.getenv("ELEVENLABS_API_KEY") or None
     elevenlabs_model_id: str = os.getenv(
