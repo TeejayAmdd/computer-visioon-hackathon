@@ -361,11 +361,7 @@ function App() {
       <header className="topbar">
         <a className="brand" href="/" aria-label="Chreey home">
           <span className="brand-mark" aria-hidden="true">
-            <svg viewBox="0 0 24 24" focusable="false">
-              <circle cx="12" cy="12" r="8.25" />
-              <circle cx="12" cy="12" r="2.5" />
-              <path d="M12 1.75v3M22.25 12h-3M12 22.25v-3M1.75 12h3" />
-            </svg>
+            <img src="/chreey-mark.png" alt="" />
           </span>
           <span>Chreey</span>
         </a>

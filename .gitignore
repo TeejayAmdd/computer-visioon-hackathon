@@ -46,5 +46,6 @@ models/**/*.pt
 backend/models/*.pt
 backend/models/**/*.pt
 !backend/models/base/yolo11n.pt
+!backend/models/teammate_model/cherry_eye_model_best.pt
 models/*.onnx
 runs/

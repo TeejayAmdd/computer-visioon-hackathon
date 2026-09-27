@@ -1,6 +1,6 @@
-# Sightline Accessibility Assistant
+# Cherry Accessibility Assistant
 
-Sightline is a computer-vision accessibility assistant for blind and low-vision
+Cherry is a computer-vision accessibility assistant for blind and low-vision
 users. It uses a camera to capture the user's surroundings, a FastAPI service to
 run object detection, and a React interface to show and speak the results.
 
@@ -37,11 +37,11 @@ React renders boxes, object details, and spoken narration
 | React WebSocket integration | Implemented |
 | Ultralytics YOLO detection | Implemented with `yolo11n.pt` |
 
-The backend loads the configured Ultralytics model from
-`backend/models/teammate_model/best.pt` by default. The original base weights are
-kept at `backend/models/base/yolo11n.pt`. You can switch models without changing
-Python code by setting `YOLO_MODEL_PATH` to another path relative to
-`backend/`, such as `models/base/yolo11n.pt`.
+The backend loads the teammate's Ultralytics model from
+`backend/models/teammate_model/cherry_eye_model_best.pt` by default. The original
+base weights are kept at `backend/models/base/yolo11n.pt`. You can switch models
+without changing Python code by setting `YOLO_MODEL_PATH` to another path
+relative to `backend/`, such as `models/base/yolo11n.pt`.
 
 If the configured teammate model is not present or cannot be loaded, the
 detector automatically falls back to `backend/models/base/yolo11n.pt`. The
@@ -346,7 +346,7 @@ uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
 Configure these Railway service variables:
 
 ```env
-YOLO_MODEL_PATH=models/teammate_model/best.pt
+YOLO_MODEL_PATH=models/teammate_model/cherry_eye_model_best.pt
 CONFIDENCE_THRESHOLD=0.35
 ALLOWED_ORIGINS=https://your-site.netlify.app
 ```
@@ -378,12 +378,12 @@ Install the YOLO dependency:
 ```
 
 Extract the teammates' ZIP into `backend\models\teammate_model\`. If the ZIP
-contains nested training output, locate the trained `.pt` file (normally
-`best.pt`) and place or copy that file at
-`backend\models\teammate_model\best.pt`. The active model is configured with:
+contains nested training output, locate the trained `.pt` file and place or copy
+it at `backend\models\teammate_model\cherry_eye_model_best.pt`. The active model
+is configured with:
 
 ```env
-YOLO_MODEL_PATH=models/teammate_model/best.pt
+YOLO_MODEL_PATH=models/teammate_model/cherry_eye_model_best.pt
 ```
 
 The path is resolved relative to `backend/` and works on Windows and Railway's

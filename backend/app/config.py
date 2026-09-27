@@ -13,7 +13,10 @@ class Settings:
     model_path: Path = Path(
         os.getenv(
             "YOLO_MODEL_PATH",
-            os.getenv("MODEL_PATH", "models/teammate_model/best.pt"),
+            os.getenv(
+                "MODEL_PATH",
+                "models/teammate_model/cherry_eye_model_best.pt",
+            ),
         )
     )
     fallback_model_path: Path = BASE_DIR / "models" / "base" / "yolo11n.pt"
