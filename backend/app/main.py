@@ -4,13 +4,21 @@ from typing import Annotated
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from starlette.concurrency import run_in_threadpool
 
 from app.config import settings
 from app.schemas.detection import DetectionResponse
+from app.schemas.tts import SpeakRequest
 from app.services.detector import Detector, InvalidImageError, ModelUnavailableError
+from app.services.elevenlabs_service import ElevenLabsError, ElevenLabsService
 
 detector = Detector(settings.model_path, settings.confidence_threshold)
+elevenlabs = ElevenLabsService(
+    settings.elevenlabs_api_key,
+    settings.elevenlabs_model_id,
+    settings.elevenlabs_default_voice_id,
+)
 logger = logging.getLogger(__name__)
 
 
@@ -34,6 +42,25 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/api/tts/voices")
+async def get_tts_voices() -> dict:
+    try:
+        return await elevenlabs.get_voices()
+    except ElevenLabsError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@app.post("/api/tts/speak")
+async def speak(request: SpeakRequest) -> Response:
+    try:
+        audio = await elevenlabs.text_to_speech(
+            request.text, request.voice_id, request.model_id
+        )
+    except ElevenLabsError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return Response(content=audio, media_type="audio/mpeg")
 
 
 @app.get("/health")

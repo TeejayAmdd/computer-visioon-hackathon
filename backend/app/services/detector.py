@@ -62,7 +62,7 @@ class Detector:
     def load(self) -> None:
         can_download_default = self.model_path.name in {"yolo11n.pt", "yolov8n.pt"}
         if not self.model_path.exists() and not can_download_default:
-            self.load_error = f"Model file not found: {self.model_path}"
+            self.load_error = f"YOLO model not found at: {self.model_path}"
             logging.error(self.load_error)
             return
         try:
@@ -71,10 +71,13 @@ class Detector:
             self.model = YOLO(str(self.model_path))
             self.mode = "yolo"
             self.load_error = None
-        except (ImportError, OSError, RuntimeError) as exc:
+        except Exception as exc:
             self.model = None
             self.mode = "fallback"
-            self.load_error = f"{type(exc).__name__}: {exc}"
+            self.load_error = (
+                f"Could not load YOLO model at {self.model_path}: "
+                f"{type(exc).__name__}: {exc}"
+            )
             logging.exception("Could not load YOLO model from %s", self.model_path)
 
     def detect(self, image_bytes: bytes) -> list[Detection]:

@@ -37,9 +37,11 @@ React renders boxes, object details, and spoken narration
 | React WebSocket integration | Implemented |
 | Ultralytics YOLO detection | Implemented with `yolo11n.pt` |
 
-The backend uses Ultralytics `yolo11n.pt` by default. Ultralytics downloads that
-model into `backend/models/` on first startup. You can replace it with trained
-weights by setting `MODEL_PATH` to another `.pt` file.
+The backend loads the configured Ultralytics model from
+`backend/models/teammate_model/best.pt` by default. The original base weights are
+kept at `backend/models/base/yolo11n.pt`. You can switch models without changing
+Python code by setting `YOLO_MODEL_PATH` to another path relative to
+`backend/`, such as `models/base/yolo11n.pt`.
 
 ## Repository structure
 
@@ -59,6 +61,11 @@ frontend_react/
 │   │   │   └── detection.py      # Pydantic response models
 │   │   └── services/
 │   │       └── detector.py       # Image validation and YOLO inference
+│   ├── models/
+│   │   ├── base/
+│   │   │   └── yolo11n.pt
+│   │   └── teammate_model/
+│   │       └── best.pt
 │   ├── requirements.txt
 │   └── .env.example
 └── README.md
@@ -323,6 +330,27 @@ The frontend normally runs at:
 http://localhost:5173
 ```
 
+### Railway backend
+
+Railway builds the root `Dockerfile` and uses the start command in
+`railway.json`:
+
+```text
+uvicorn app.main:app --app-dir backend --host 0.0.0.0 --port $PORT
+```
+
+Configure these Railway service variables:
+
+```env
+YOLO_MODEL_PATH=models/teammate_model/best.pt
+CONFIDENCE_THRESHOLD=0.35
+ALLOWED_ORIGINS=https://your-site.netlify.app
+```
+
+Railway supplies `PORT`; do not replace `$PORT` with a fixed production port.
+The Docker image copies `backend/`, so the configured relative model path is
+resolved inside the deployed backend directory.
+
 ### Backend environment variables
 
 Copy `backend\.env.example` to a local environment configuration if needed:
@@ -339,9 +367,30 @@ Install the YOLO dependency:
 .\.venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 ```
 
-The default `yolo11n.pt` weights download automatically into `backend\models\`
-when the backend starts. To use a trained model, place its weights in that
-folder and set `MODEL_PATH=models/<your-model>.pt`.
+Extract the teammates' ZIP into `backend\models\teammate_model\`. If the ZIP
+contains nested training output, locate the trained `.pt` file (normally
+`best.pt`) and place or copy that file at
+`backend\models\teammate_model\best.pt`. The active model is configured with:
+
+```env
+YOLO_MODEL_PATH=models/teammate_model/best.pt
+```
+
+The path is resolved relative to `backend/` and works on Windows and Railway's
+Linux environment. Class names come from the loaded YOLO model at inference
+time; no frontend class list needs to be updated for newly trained classes.
+
+For local development, run the backend with:
+
+```powershell
+.\backend\.venv\Scripts\python.exe -m uvicorn app.main:app --app-dir backend --reload --port 8000 --env-file backend\.env
+```
+
+To use the base model instead, set:
+
+```env
+YOLO_MODEL_PATH=models/base/yolo11n.pt
+```
 
 ## Testing the backend
 

@@ -42,5 +42,8 @@ wheels/
 # YOLO datasets, runs, caches, and generated weights
 training/
 models/*.pt
+models/**/*.pt
+backend/models/*.pt
+backend/models/**/*.pt
 models/*.onnx
 runs/

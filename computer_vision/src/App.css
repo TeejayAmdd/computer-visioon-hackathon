@@ -25,6 +25,8 @@ h1 { max-width: 600px; margin-bottom: 14px; font-size: clamp(38px, 5vw, 67px); l
 .workspace { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, .8fr); gap: 18px; }
 .camera-card, .detections-card { border: 1px solid var(--line); border-radius: 20px; background: var(--surface); overflow: hidden; }
 .camera-toolbar { justify-content: space-between; padding: 22px 24px 18px; }
+.voice-controls { display: flex; align-items: center; gap: 10px; padding: 0 24px 18px; color: var(--muted); font-size: 12px; }
+.voice-controls select { min-width: 150px; border: 1px solid var(--line); border-radius: 7px; padding: 7px 9px; color: var(--ink); background: var(--surface); font: inherit; }
 .muted-text, .control-hint { margin: 0; color: var(--muted); font-size: 12px; }
 .text-button { border: 0; background: transparent; color: var(--green); font-weight: 700; font-size: 12px; cursor: pointer; }
 .camera-stage { position: relative; min-height: 390px; margin: 0 12px; border-radius: 12px; overflow: hidden; background: #dfe7df; }

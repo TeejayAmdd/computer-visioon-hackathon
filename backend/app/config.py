@@ -2,24 +2,33 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+BASE_DIR = Path(__file__).resolve().parents[1]
+
 
 @dataclass(frozen=True)
 class Settings:
     model_path: Path = Path(
         os.getenv(
-            "MODEL_PATH",
-            str(Path(__file__).resolve().parents[1] / "models" / "yolo11n.pt"),
+            "YOLO_MODEL_PATH",
+            os.getenv("MODEL_PATH", "models/teammate_model/best.pt"),
         )
     )
     confidence_threshold: float = float(os.getenv("CONFIDENCE_THRESHOLD", "0.35"))
-    allowed_origins: list[str] = None  # type: ignore[assignment]
+    elevenlabs_api_key: str | None = os.getenv("ELEVENLABS_API_KEY") or None
+    elevenlabs_model_id: str = os.getenv(
+        "ELEVENLABS_MODEL_ID", "eleven_flash_v2_5"
+    )
+    elevenlabs_default_voice_id: str | None = (
+        os.getenv("ELEVENLABS_DEFAULT_VOICE_ID") or None
+    )
+    allowed_origins: list[str] | None = None
 
     def __post_init__(self) -> None:
         if not self.model_path.is_absolute():
             object.__setattr__(
                 self,
                 "model_path",
-                Path(__file__).resolve().parents[1] / self.model_path,
+                BASE_DIR / self.model_path,
             )
         if self.allowed_origins is None:
             configured_origins = os.getenv(

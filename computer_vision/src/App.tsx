@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import './App.css'
+import { generateSpeech, getVoices, type Voice } from './services/tts'
 
 type Zone = 'left' | 'center' | 'right'
 type Distance = 'near' | 'mid' | 'far'
@@ -39,8 +40,12 @@ function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const pollingTimerRef = useRef<number | null>(null)
+  const pollDetectionRef = useRef<(() => Promise<void>) | null>(null)
   const detectionRequestedRef = useRef(false)
   const lastNarrationRef = useRef('')
+  const speechQueueRef = useRef<string[]>([])
+  const speechProcessingRef = useRef(false)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isCameraOn, setIsCameraOn] = useState(false)
   const [isDetecting, setIsDetecting] = useState(false)
   const [isMuted, setIsMuted] = useState(false)
@@ -48,6 +53,10 @@ function App() {
   const [detections, setDetections] = useState<Detection[]>([])
   const [error, setError] = useState('')
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [voices, setVoices] = useState<Voice[]>([])
+  const [selectedVoiceId, setSelectedVoiceId] = useState(
+    () => window.localStorage.getItem('chreey_voice_id') ?? '',
+  )
 
   useEffect(() => {
     document.documentElement.dataset.theme = isDarkTheme ? 'dark' : 'light'
@@ -69,16 +78,55 @@ function App() {
     setIsDetecting(false)
   }, [])
 
+  const fallbackSpeech = useCallback((message: string) => {
+    if (!('speechSynthesis' in window)) return Promise.resolve()
+    return new Promise<void>((resolve) => {
+      const utterance = new SpeechSynthesisUtterance(message)
+      utterance.onend = () => resolve()
+      utterance.onerror = () => resolve()
+      window.speechSynthesis.speak(utterance)
+    })
+  }, [])
+
+  const processSpeechQueue = useCallback(async () => {
+    if (speechProcessingRef.current) return
+    speechProcessingRef.current = true
+    while (speechQueueRef.current.length > 0) {
+      const message = speechQueueRef.current.shift()
+      if (!message) continue
+      try {
+        const blob = await generateSpeech(message, selectedVoiceId || undefined)
+        const url = URL.createObjectURL(blob)
+        const audio = new Audio(url)
+        audioRef.current = audio
+        await new Promise<void>((resolve, reject) => {
+          audio.onended = () => resolve()
+          audio.onerror = () => reject(new Error('Audio playback failed.'))
+          void audio.play().catch(reject)
+        })
+        URL.revokeObjectURL(url)
+        audioRef.current = null
+      } catch {
+        await fallbackSpeech(message)
+      }
+    }
+    speechProcessingRef.current = false
+  }, [fallbackSpeech, selectedVoiceId])
+
+  const enqueueSpeech = useCallback((message: string) => {
+    speechQueueRef.current.push(message)
+    void processSpeechQueue()
+  }, [processSpeechQueue])
+
   const narrate = useCallback(
     (nextDetections: Detection[]) => {
-      if (isMuted || !('speechSynthesis' in window) || nextDetections.length === 0) return
+      if (isMuted || nextDetections.length === 0) return
       const message = nextDetections.map(formatDetection).join(' ')
       if (message === lastNarrationRef.current) return
       lastNarrationRef.current = message
-      window.speechSynthesis.cancel()
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(message))
+      enqueueSpeech(message)
     },
-    [isMuted],
+    [enqueueSpeech, isMuted],
   )
 
   const captureFrame = useCallback(async (): Promise<Blob | null> => {
@@ -133,9 +181,33 @@ function App() {
     }
 
     if (detectionRequestedRef.current) {
-      pollingTimerRef.current = window.setTimeout(() => void pollDetection(), 2500)
+      pollingTimerRef.current = window.setTimeout(() => void pollDetectionRef.current?.(), 2500)
     }
   }, [captureFrame, narrate])
+  pollDetectionRef.current = pollDetection
+
+  useEffect(() => {
+    void getVoices()
+      .then((availableVoices) => {
+        setVoices(availableVoices)
+        if (!selectedVoiceId && availableVoices.length > 0) {
+          setSelectedVoiceId(availableVoices[0].voice_id)
+        }
+      })
+      .catch(() => {
+        setError('Could not load ElevenLabs voices. Browser narration remains available.')
+      })
+  }, [selectedVoiceId])
+
+  useEffect(() => {
+    if (selectedVoiceId) window.localStorage.setItem('chreey_voice_id', selectedVoiceId)
+  }, [selectedVoiceId])
+
+  useEffect(() => () => {
+    audioRef.current?.pause()
+    speechQueueRef.current = []
+    window.speechSynthesis?.cancel()
+  }, [])
 
   const startCamera = async (): Promise<boolean> => {
     try {
@@ -225,6 +297,21 @@ function App() {
             </div>
             <button className="text-button" type="button" onClick={isCameraOn ? stopCamera : startCamera}>
               {isCameraOn ? 'Turn off' : 'Allow camera'}
+            </button>
+          </div>
+          <div className="voice-controls">
+            <label htmlFor="voice-select">Chreey voice</label>
+            <select
+              id="voice-select"
+              value={selectedVoiceId}
+              onChange={(event) => setSelectedVoiceId(event.target.value)}
+              disabled={voices.length === 0}
+            >
+              <option value="">Browser fallback</option>
+              {voices.map((voice) => <option key={voice.voice_id} value={voice.voice_id}>{voice.name}</option>)}
+            </select>
+            <button className="text-button" type="button" onClick={() => enqueueSpeech('Hello. I am Chreey. This is a test of the selected voice.')}>
+              Test Voice
             </button>
           </div>
           <div className="camera-stage">
