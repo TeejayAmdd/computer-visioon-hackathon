@@ -20,9 +20,9 @@ type Detection = {
   box: { x1: number; y1: number; x2: number; y2: number }
 }
 
-const API_URL = (import.meta.env.VITE_API_URL ?? (import.meta.env.DEV
+const API_URL = (import.meta.env.VITE_API_URL?.trim() ?? (import.meta.env.DEV
   ? 'http://localhost:8000'
-  : 'https://computervision-production.up.railway.app')).replace(/\/+$/, '')
+  : '')).replace(/\/+$/, '')
 
 
 function formatDetection(detection: Detection) {
@@ -203,8 +203,9 @@ function App() {
           setSelectedVoiceId(availableVoices[0].voice_id)
         }
       })
-      .catch(() => {
-        setError('Could not load ElevenLabs voices. Browser narration remains available.')
+      .catch((error: unknown) => {
+        const detail = error instanceof Error ? error.message : 'Unknown backend error.'
+        setError(`Could not load ElevenLabs voices. ${detail} Browser narration remains available.`)
       })
   }, [])
 

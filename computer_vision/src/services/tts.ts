@@ -11,10 +11,19 @@ const request = async (path: string, init?: RequestInit): Promise<Response> => {
   if (!apiUrl) {
     throw new Error('The production API is not configured. Set VITE_API_URL in Netlify and redeploy.')
   }
-  const response = await fetch(`${apiUrl}${path}`, init)
+  const endpoint = `${apiUrl}${path}`
+  let response: Response
+  try {
+    response = await fetch(endpoint, init)
+  } catch (error) {
+    throw new Error(
+      `Could not reach the backend at ${endpoint}. Check VITE_API_URL, the Railway public domain, and CORS.`,
+      { cause: error },
+    )
+  }
   if (!response.ok) {
     const detail = await response.text()
-    throw new Error(detail || `HTTP ${response.status}`)
+    throw new Error(`${endpoint} returned HTTP ${response.status}: ${detail || 'No response detail.'}`)
   }
   return response
 }
