@@ -99,13 +99,16 @@ function App() {
         const url = URL.createObjectURL(blob)
         const audio = new Audio(url)
         audioRef.current = audio
-        await new Promise<void>((resolve, reject) => {
-          audio.onended = () => resolve()
-          audio.onerror = () => reject(new Error('Audio playback failed.'))
-          void audio.play().catch(reject)
-        })
-        URL.revokeObjectURL(url)
-        audioRef.current = null
+        try {
+          await new Promise<void>((resolve, reject) => {
+            audio.onended = () => resolve()
+            audio.onerror = () => reject(new Error('Audio playback failed.'))
+            void audio.play().catch(reject)
+          })
+        } finally {
+          URL.revokeObjectURL(url)
+          audioRef.current = null
+        }
       } catch {
         await fallbackSpeech(message)
       }
@@ -184,20 +187,26 @@ function App() {
       pollingTimerRef.current = window.setTimeout(() => void pollDetectionRef.current?.(), 2500)
     }
   }, [captureFrame, narrate])
-  pollDetectionRef.current = pollDetection
+  useEffect(() => {
+    pollDetectionRef.current = pollDetection
+    return () => {
+      pollDetectionRef.current = null
+    }
+  }, [pollDetection])
 
   useEffect(() => {
+    const storedVoiceId = window.localStorage.getItem('chreey_voice_id') ?? ''
     void getVoices()
       .then((availableVoices) => {
         setVoices(availableVoices)
-        if (!selectedVoiceId && availableVoices.length > 0) {
+        if (!storedVoiceId && availableVoices.length > 0) {
           setSelectedVoiceId(availableVoices[0].voice_id)
         }
       })
       .catch(() => {
         setError('Could not load ElevenLabs voices. Browser narration remains available.')
       })
-  }, [selectedVoiceId])
+  }, [])
 
   useEffect(() => {
     if (selectedVoiceId) window.localStorage.setItem('chreey_voice_id', selectedVoiceId)
@@ -257,7 +266,7 @@ function App() {
       <header className="topbar">
         <a className="brand" href="/" aria-label="Sightline home">
           <span className="brand-mark" aria-hidden="true">◉</span>
-          <span>Cheery_eye</span>
+          <span>Sightline</span>
         </a>
         <div className="topbar-actions">
           <button
