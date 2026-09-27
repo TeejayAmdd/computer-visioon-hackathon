@@ -359,6 +359,9 @@ Copy `backend\.env.example` to a local environment configuration if needed:
 MODEL_PATH=models/yolo11n.pt
 CONFIDENCE_THRESHOLD=0.35
 ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+ELEVENLABS_API_KEY=
+ELEVENLABS_MODEL_ID=eleven_flash_v2_5
+ELEVENLABS_DEFAULT_VOICE_ID=
 ```
 
 Install the YOLO dependency:
@@ -391,6 +394,34 @@ To use the base model instead, set:
 ```env
 YOLO_MODEL_PATH=models/base/yolo11n.pt
 ```
+
+## ElevenLabs text-to-speech
+
+The existing detection pipeline remains responsible for deciding what to say.
+The frontend sends announcement text to the FastAPI backend, and only the
+backend calls ElevenLabs. The API key is never sent to the browser.
+
+The backend exposes:
+
+```text
+GET  /api/tts/voices
+POST /api/tts/speak
+```
+
+The React app loads voices from the backend, stores only the selected voice ID
+in `localStorage` under `chreey_voice_id`, and queues announcements so audio
+does not overlap. If ElevenLabs or audio playback fails, browser speech
+synthesis is used as a fallback.
+
+Set the backend variables in `backend\.env` locally or in Railway. Set only
+`VITE_API_URL` in the frontend environment:
+
+```env
+VITE_API_URL=http://127.0.0.1:8000
+```
+
+For Netlify, use the public Railway backend URL instead. Never create a
+`VITE_ELEVENLABS_API_KEY` variable.
 
 ## Testing the backend
 
