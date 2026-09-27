@@ -42,9 +42,11 @@ function App() {
   const pollingTimerRef = useRef<number | null>(null)
   const pollDetectionRef = useRef<(() => Promise<void>) | null>(null)
   const detectionRequestedRef = useRef(false)
-  const lastNarrationRef = useRef('')
-  const speechQueueRef = useRef<string[]>([])
+  const activeObjectsRef = useRef(new Map<string, number>())
+  const speechQueueRef = useRef<string | null>(null)
   const speechProcessingRef = useRef(false)
+  const speechVersionRef = useRef(0)
+  const speechAbortRef = useRef<AbortController | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [isCameraOn, setIsCameraOn] = useState(false)
   const [isDetecting, setIsDetecting] = useState(false)
@@ -91,43 +93,74 @@ function App() {
   const processSpeechQueue = useCallback(async () => {
     if (speechProcessingRef.current) return
     speechProcessingRef.current = true
-    while (speechQueueRef.current.length > 0) {
-      const message = speechQueueRef.current.shift()
-      if (!message) continue
+    while (speechQueueRef.current) {
+      const message = speechQueueRef.current
+      speechQueueRef.current = null
+      const version = speechVersionRef.current
+      const abortController = new AbortController()
+      speechAbortRef.current = abortController
       try {
-        const blob = await generateSpeech(message, selectedVoiceId || undefined)
-        const url = URL.createObjectURL(blob)
-        const audio = new Audio(url)
-        audioRef.current = audio
-        try {
-          await new Promise<void>((resolve, reject) => {
-            audio.onended = () => resolve()
-            audio.onerror = () => reject(new Error('Audio playback failed.'))
-            void audio.play().catch(reject)
-          })
-        } finally {
-          URL.revokeObjectURL(url)
-          audioRef.current = null
+        const blob = await generateSpeech(
+          message,
+          selectedVoiceId || undefined,
+          undefined,
+          abortController.signal,
+        )
+        if (version === speechVersionRef.current) {
+          const url = URL.createObjectURL(blob)
+          const audio = new Audio(url)
+          audioRef.current = audio
+          try {
+            await new Promise<void>((resolve, reject) => {
+              audio.onended = () => resolve()
+              audio.onerror = () => reject(new Error('Audio playback failed.'))
+              void audio.play().catch(reject)
+            })
+          } finally {
+            URL.revokeObjectURL(url)
+            if (audioRef.current === audio) audioRef.current = null
+          }
         }
       } catch {
-        await fallbackSpeech(message)
+        if (version === speechVersionRef.current) await fallbackSpeech(message)
       }
+      if (speechAbortRef.current === abortController) speechAbortRef.current = null
     }
     speechProcessingRef.current = false
   }, [fallbackSpeech, selectedVoiceId])
 
   const enqueueSpeech = useCallback((message: string) => {
-    speechQueueRef.current.push(message)
+    speechVersionRef.current += 1
+    speechQueueRef.current = message
+    speechAbortRef.current?.abort()
+    audioRef.current?.pause()
+    audioRef.current = null
+    window.speechSynthesis?.cancel()
     void processSpeechQueue()
   }, [processSpeechQueue])
 
   const narrate = useCallback(
     (nextDetections: Detection[]) => {
-      if (isMuted || nextDetections.length === 0) return
-      const message = nextDetections.map(formatDetection).join(' ')
-      if (message === lastNarrationRef.current) return
-      lastNarrationRef.current = message
-      enqueueSpeech(message)
+      const currentLabels = new Set(nextDetections.map((detection) => detection.label))
+      const newDetections = nextDetections.filter((detection) => {
+        const missedFrames = activeObjectsRef.current.get(detection.label)
+        activeObjectsRef.current.set(detection.label, 0)
+        return missedFrames === undefined
+      })
+
+      for (const [label, missedFrames] of activeObjectsRef.current) {
+        if (!currentLabels.has(label)) {
+          const nextMissedFrames = missedFrames + 1
+          if (nextMissedFrames >= 2) {
+            activeObjectsRef.current.delete(label)
+          } else {
+            activeObjectsRef.current.set(label, nextMissedFrames)
+          }
+        }
+      }
+
+      if (isMuted || newDetections.length === 0) return
+      enqueueSpeech(newDetections.map(formatDetection).join(' '))
     },
     [enqueueSpeech, isMuted],
   )
@@ -215,7 +248,12 @@ function App() {
 
   useEffect(() => () => {
     audioRef.current?.pause()
-    speechQueueRef.current = []
+    activeObjectsRef.current.clear()
+    speechQueueRef.current = null
+    speechVersionRef.current += 1
+    speechAbortRef.current?.abort()
+    audioRef.current?.pause()
+    audioRef.current = null
     window.speechSynthesis?.cancel()
   }, [])
 

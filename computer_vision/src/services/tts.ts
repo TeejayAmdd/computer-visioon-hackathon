@@ -38,11 +38,13 @@ export async function generateSpeech(
   text: string,
   voiceId?: string,
   modelId?: string,
+  signal?: AbortSignal,
 ): Promise<Blob> {
   const response = await request('/api/tts/speak', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, voice_id: voiceId, model_id: modelId }),
+    signal,
   })
   return response.blob()
 }
