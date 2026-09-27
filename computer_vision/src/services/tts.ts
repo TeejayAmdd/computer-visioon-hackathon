@@ -4,9 +4,13 @@ export type Voice = {
 }
 
 const request = async (path: string, init?: RequestInit): Promise<Response> => {
-  const apiUrl = (import.meta.env.VITE_API_URL ?? (import.meta.env.DEV
+  const configuredApiUrl = import.meta.env.VITE_API_URL?.trim()
+  const apiUrl = (configuredApiUrl ?? (import.meta.env.DEV
     ? 'http://localhost:8000'
-    : 'https://computervision-production.up.railway.app')).replace(/\/+$/, '')
+    : '')).replace(/\/+$/, '')
+  if (!apiUrl) {
+    throw new Error('The production API is not configured. Set VITE_API_URL in Netlify and redeploy.')
+  }
   const response = await fetch(`${apiUrl}${path}`, init)
   if (!response.ok) {
     const detail = await response.text()
