@@ -112,8 +112,23 @@ function App() {
           audioRef.current = audio
           try {
             await new Promise<void>((resolve, reject) => {
-              audio.onended = () => resolve()
-              audio.onerror = () => reject(new Error('Audio playback failed.'))
+              const cleanup = () => {
+                abortController.signal.removeEventListener('abort', handleAbort)
+              }
+              const handleAbort = () => {
+                audio.pause()
+                cleanup()
+                reject(new DOMException('Speech announcement was replaced.', 'AbortError'))
+              }
+              audio.onended = () => {
+                cleanup()
+                resolve()
+              }
+              audio.onerror = () => {
+                cleanup()
+                reject(new Error('Audio playback failed.'))
+              }
+              abortController.signal.addEventListener('abort', handleAbort, { once: true })
               void audio.play().catch(reject)
             })
           } finally {
