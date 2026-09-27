@@ -39,13 +39,4 @@ wheels/
 .env.*
 !.env.example
 
-# YOLO datasets, runs, caches, and generated weights
-training/
-models/*.pt
-models/**/*.pt
-backend/models/*.pt
-backend/models/**/*.pt
-!backend/models/base/yolo11n.pt
-!backend/models/teammate_model/cherry_eye_model_best.pt
-models/*.onnx
-runs/
+ 
