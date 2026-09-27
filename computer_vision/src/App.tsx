@@ -32,7 +32,7 @@ function formatDetection(detection: Detection) {
   const position = detection.horizontal_position === 'center' && detection.vertical_position === 'eye-level'
     ? 'directly ahead'
     : `${detection.vertical_position === 'eye-level' ? '' : `${detection.vertical_position} and `}${detection.horizontal_position}`
-  return `${detection.label} ${distance}, ${position}${detection.navigation_relevant ? ', potentially relevant for navigation' : ''}.`
+  return `${detection.label} ${distance}, ${position}.`
 }
 
 function App() {
